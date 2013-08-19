@@ -24,7 +24,7 @@
     <script>
       (function (w, d, T) {
         var Math = w.Math,
-            renderer, camera, scene, contols;
+            renderer, camera, scene, controls;
 
         function pickSpherePoint (x0, y0, z0, radius) {
           var u, v, theta, phi, x, y, z;
@@ -53,8 +53,7 @@
         function init () {
           var width, height, aspect, container,
               axes,
-              dotGeometry, dotMaterial,
-              createDot;
+              dotGeometry, dotMaterial;
 
           width = w.innerWidth;
           height = w.innerHeight;
@@ -77,7 +76,7 @@
           dotGeometry = new T.SphereGeometry(1, 16, 8);
           dotMaterial = new T.MeshBasicMaterial({ color: 0x000000 });
 
-          createDot = function (radius) {
+          function createDot (radius) {
             var pos, dot;
 
             pos = pickSpherePoint(0, 0, 0, radius);
@@ -85,7 +84,7 @@
             dot.position.set(pos.x, pos.y, pos.z);
 
             return dot;
-          };
+          }
 
           for (var i = 0; i < 1000; i++) {
             var dot = createDot(300);

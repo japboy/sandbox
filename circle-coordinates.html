@@ -56,8 +56,7 @@
         function init () {
           var width, height, aspect, container,
               axes,
-              dotGeometry, dotMaterial, coords,
-              createDot;
+              dotGeometry, dotMaterial, coords;
 
           width = w.innerWidth;
           height = w.innerHeight;
@@ -80,7 +79,7 @@
           dotGeometry = new T.SphereGeometry(1, 16, 8);
           dotMaterial = new T.MeshBasicMaterial({ color: 0x000000 });
 
-          createDot = function (x, y, z) {
+          function createDot (x, y, z) {
             var dot;
 
             dot = new T.Mesh(dotGeometry.clone(), dotMaterial.clone());
