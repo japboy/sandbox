@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+
+    <title>Ascii Camera</title>
+
+    <style>
+      #main {
+        height: 100%;
+        left: 0;
+        overflow: hidden;
+        position: absolute;
+        top: 0;
+        width: 100%;
+      }
+      #main > pre {
+        left: 50%;
+        margin: 0;
+        position: absolute;
+        top: 50%;
+      }
+      footer {
+        background-color: rgba(255,255,255,0.9);
+        bottom: 10px;
+        padding: 10px;
+        position: absolute;
+        right: 10px;
+      }
+      footer > ul {
+        margin: 0;
+        padding: 0 0 0 1.5em;
+      }
+    </style>
+
+    <script>
+      (function (w, d, n) {
+
+        // Polyfills for vendor prefixes
+
+        n.getUserMedia = (n.getUserMedia ||
+                          n.mozGetUserMedia ||
+                          n.msGetUserMedia ||
+                          n.webkitGetUserMedia);
+        w.URL = (w.URL || w.webkitURL);
+
+
+        // Main
+
+        var WIDTH = 320, HEIGHT = 160,
+            Math = w.Math,
+            container, video, canvas, renderer;
+
+        canvas = {
+          el: {},
+          ctx: {},
+          data: {},
+          lastData: null
+        };
+
+        function contrastFactor (contrast) {
+          return (259 * (contrast + 255)) / (255 * (259 - contrast));
+        }
+
+        function colorAtOffset (data, offset) {
+          return {
+            r: data[offset],
+            g: data[offset + 1],
+            b: data[offset + 2],
+            a: data[offset + 3]
+          };
+        }
+
+        function bound (value, interval) {
+          return Math.max(interval[0], Math.min(interval[1], value))
+        }
+
+        function contrastFilter (color) {
+          return {
+            r: bound(Math.floor((color.r - 128) * contrastFactor) + 128, [0, 255]),
+            g: bound(Math.floor((color.g - 128) * contrastFactor) + 128, [0, 255]),
+            b: bound(Math.floor((color.b - 128) * contrastFactor) + 128, [0, 255]),
+            a: color.a
+          };
+        }
+
+        function perceivedBrightnessRGB (r, g, b) {
+          return (0.299 * r + 0.578 * g + 0.114 * b) / 255;
+        }
+
+        function ascii (image, width, height) {
+          var characters, y, x, buffer;
+
+          //characters = ' .,:;i1tfLCG08@'.split('');
+          //characters = ' \u2591\u2592\u2593\u2588'.split('').reverse();
+          characters = '0Oo:. '.split('').reverse();
+          buffer = '';
+
+          for (y = 0; y < height; y += 2) {
+            for (x = 0; x < width; x++) {
+              var offset, color, brightness, character;
+
+              offset = (y * width + x) * 4;
+              color = colorAtOffset(image.data, offset);
+              //color = contrastFilter(color);
+              brightness = perceivedBrightnessRGB(color.r, color.g, color.b);
+              character = characters[(characters.length - 1) - Math.round(brightness * (characters.length - 1))];
+              buffer += character;
+            }
+            buffer += '\n';
+          }
+
+          return buffer;
+        }
+
+        function init () {
+          var width = w.innerWidth, height = w.innerHeight;
+
+          function handleError (code) {
+            throw new Error('No stream received.');
+          };
+
+          function handleSuccess (stream) {
+            video.src = w.URL.createObjectURL(stream);
+            video.onerror = function (err) { stream.stop(); };
+          };
+
+          container = d.getElementById('main');
+
+          video = d.createElement('video');
+          video.autoplay = true;
+          video.width = WIDTH;
+          video.height = HEIGHT;
+
+          renderer = d.createElement('pre');
+          renderer.style.fontFamily = 'monospace';
+          renderer.style.fontSize = '12px';
+          renderer.style.lineHeight = '1';
+          renderer.style.letterSpacing = '-0.2em';
+
+          canvas.el = d.createElement('canvas');
+          canvas.el.width = WIDTH;
+          canvas.el.height = HEIGHT;
+
+          canvas.ctx = canvas.el.getContext('2d');
+          canvas.ctx.fillStyle = '#000000';
+          canvas.ctx.fillRect(0, 0,  canvas.width, canvas.height);
+          canvas.ctx.translate(WIDTH, 0);
+          canvas.ctx.scale(-1, 1);
+
+          container.appendChild(renderer);
+
+          n.getUserMedia({
+            video: true, audio: false
+          }, handleSuccess, handleError);
+        }
+
+        function animate () {
+          w.requestAnimationFrame(animate);
+
+          if (video.HAVE_ENOUGH_DATA === video.readyState) {
+            canvas.ctx.drawImage(video, 0, 0, WIDTH, HEIGHT);
+            var data = canvas.ctx.getImageData(0, 0, WIDTH, HEIGHT);
+            renderer.innerHTML = ascii(data, WIDTH, HEIGHT);
+            renderer.style.marginLeft = -(renderer.offsetWidth / 2) + 'px'
+            renderer.style.marginTop = -(renderer.offsetHeight / 2) + 'px'
+          }
+        }
+
+        w.addEventListener('load', function () {
+          init();
+          animate();
+        }, false);
+
+      })(window, document, navigator);
+    </script>
+  </head>
+
+  <body>
+    <section id="main" role="main"></section>
+    <footer>
+      <ul>
+        <li><a href="http://idevelop.ro/ascii-camera/">ascii camera</a></li>
+      </ul>
+    </footer>
+  </body>
+</html>

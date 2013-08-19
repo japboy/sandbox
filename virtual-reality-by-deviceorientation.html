@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+
+    <title>Virtual Reality with DeviceOrientation</title>
+
+    <style>
+      #main,
+      #main > canvas {
+        left: 0;
+        position: absolute;
+        top: 0;
+      }
+      footer {
+        background-color: rgba(255,255,255,0.9);
+        bottom: 10px;
+        padding: 10px;
+        position: absolute;
+        right: 10px;
+      }
+      footer > ul {
+        margin: 0;
+        padding-left: 1em;
+      }
+    </style>
+
+    <script src="./js/vendor/three-r60.min.js"></script>
+    <script>
+      THREE.DeviceOrientationControls = function (camera) {
+        var vector3,
+            deg2rad, rad2deg,
+            deviceorientation, devicemotion;
+
+        // DeviceOrientation Z-X'-Y''
+        camera.rotation.order = 'ZXY';
+
+        vector3 = new THREE.Vector3();
+        vector3.order = 'ZXY';
+
+        deg2rad = function (deg) {
+          return deg * (Math.PI / 180);
+        };
+
+        rad2deg = function (rad) {
+          return rad * (180 / Math.PI);
+        };
+
+        deviceorientation = function (ev) {
+          var x, y, z;
+
+          x = deg2rad(ev.beta);
+          y = deg2rad(ev.gamma);
+          z = deg2rad(ev.alpha);
+
+          vector3.set(x, y, z);
+        };
+
+        devicemotion = function (ev) {
+          var acceleration, accelerationIncludingGravity, rotationRate;
+          acceleration = ev.acceleration;
+        };
+
+        window.addEventListener('deviceorientation', deviceorientation, false);
+        //window.addEventListener('devicemotion', devicemotion, true);
+
+        this.update = function () {
+          camera.rotation.set(vector3.x, vector3.y, vector3.z);
+        };
+      };
+    </script>
+    <script>
+      (function (w, d, T) {
+        var renderer, camera, scene,
+            controls;
+
+        function resize () {
+          var width = w.innerWidth,
+              height = w.innerHeight,
+              aspect = width / height;
+
+          renderer.setSize(width, height);
+          camera.aspect = aspect;
+          camera.updateProjectionMatrix();
+        };
+
+        function init () {
+          var width, height, aspect, container,
+              axes,
+              sphereGeometry, sphereMaterial, sphere;
+
+          width = w.innerWidth;
+          height = w.innerHeight;
+          aspect = width / height;
+          container = d.getElementById('main');
+
+          renderer = new T.WebGLRenderer();
+          renderer.setClearColor(0xffffff);
+          camera = new T.PerspectiveCamera(90, aspect, 0.1, 2000);
+          camera.position.set(200, 200, 900);
+          scene = new T.Scene();
+
+
+          controls = new T.DeviceOrientationControls(camera);
+
+
+          axes = new T.AxisHelper(200);
+          scene.add(axes);
+
+          camera.lookAt(axes.position);
+
+          sphereGeometry =  new T.SphereGeometry(1000, 64, 32);
+          sphereMaterial = new T.MeshBasicMaterial({
+            color: 0xdddddd, side: T.BackSide, wireframe: true, transparent: true
+          });
+          sphere = new T.Mesh(sphereGeometry, sphereMaterial);
+          sphere.position.set(0, 0, 0);
+          scene.add(sphere);
+
+
+          w.addEventListener('resize', resize, false);
+
+          resize();
+          container.appendChild(renderer.domElement);
+        }
+
+        function animate () {
+          w.requestAnimationFrame(animate);
+          renderer.render(scene, camera);
+          controls.update();
+        }
+
+        w.addEventListener('load', function () {
+          init();
+          animate();
+        }, false);
+      })(window, document, THREE);
+    </script>
+  </head>
+
+  <body>
+    <section id="main" role="main"></section>
+    <footer>
+      <ul>
+        <li><a href="http://www.html5rocks.com/en/tutorials/device/orientation/">This End Up: Using Device Orientation and Device Motion As An Input Method - HTML5 Rocks</a></li>
+      </ul>
+    </footer>
+  </body>
+</html>

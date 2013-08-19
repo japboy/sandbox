@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+
+    <title>Virtual Reality with Oculus Rift</title>
+
+    <style>
+      #main,
+      #main > canvas {
+        left: 0;
+        position: absolute;
+        top: 0;
+      }
+      footer {
+        background-color: rgba(255,255,255,0.9);
+        bottom: 10px;
+        padding: 10px;
+        position: absolute;
+        right: 10px;
+      }
+      footer > ul {
+        margin: 0;
+        padding-left: 1em;
+      }
+    </style>
+
+    <script src="./js/vendor/vr.js"></script>
+    <script src="./js/vendor/three-r60.min.js"></script>
+    <script src="./js/vendor/three-OculusRiftEffect.js"></script>
+    <script>
+      THREE.OculusRiftControls = function (camera, vrstate) {
+        var base, quaternion;
+
+        quaternion = new THREE.Quaternion();
+
+        this.update = function () {
+          if (!vr || !vr.pollState(vrstate)) return;
+
+          var x, y, z, w;
+
+          base = camera.quaternion;
+
+          x = vrstate.hmd.rotation[0];
+          y = vrstate.hmd.rotation[1];
+          z = vrstate.hmd.rotation[2];
+          w = vrstate.hmd.rotation[3];
+
+          quaternion.set(x, y, z, w);
+
+          // FIXME: Get the quaternion before `update()` to set initial quaternion relatively
+          camera.quaternion = quaternion;
+
+          //camera.quaternion.multiplyQuaternions(base, quaternion);
+        };
+      };
+    </script>
+    <script>
+      (function (w, d, T, v) {
+        var WORLD_FACTOR, OculusRift;
+        var renderer, camera, scene,
+            vrstate, controls, effect;
+
+        WORLD_FACTOR = 1.0;
+
+        OculusRift = {
+          hResolution: 1280,
+          vResolution: 800,
+          hScreenSize: 0.14976,
+          vScreenSize: 0.0936,
+          interpupillaryDistance: 0.064,
+          lensSeparationDistance: 0.064,
+          eyeToScreenDistance: 0.041,
+          distortionK: [1.0, 0.22, 0.24, 0.0],
+          chromaAbParameter: [0.996, -0.004, 1.014, 0.0]
+        };
+
+        function resize () {
+          var width = w.innerWidth,
+              height = w.innerHeight,
+              aspect = width / height;
+
+          renderer.setSize(width, height);
+          camera.aspect = aspect;
+          camera.updateProjectionMatrix();
+
+          OculusRift.hResolution = width;
+          OculusRift.vResolution = height;
+          effect.setSize(width, height);
+        }
+
+        function init () {
+          var width, height, aspect, container,
+              axes,
+              sphereGeometry, sphereMaterial, sphere;
+
+          width = w.innerWidth;
+          height = w.innerHeight;
+          aspect = width / height;
+          container = d.getElementById('main');
+
+          renderer = new T.WebGLRenderer();
+          renderer.setClearColor(0xffffff);
+          camera = new T.PerspectiveCamera(90, aspect, 0.1, 2000);
+          camera.position.set(200, 200, 900);
+          scene = new T.Scene();
+
+
+          vrstate = new v.State();
+          controls = new T.OculusRiftControls(camera, vrstate);
+          effect = new T.OculusRiftEffect(renderer, {
+            HMD: OculusRift, worldFactor: WORLD_FACTOR
+          });
+
+
+          axes = new T.AxisHelper(200);
+          scene.add(axes);
+
+          camera.lookAt(axes.position);
+
+          sphereGeometry =  new T.SphereGeometry(1000, 64, 32);
+          sphereMaterial = new T.MeshBasicMaterial({
+            color: 0xdddddd, side: T.BackSide, wireframe: true, transparent: true
+          });
+          sphere = new T.Mesh(sphereGeometry, sphereMaterial);
+          sphere.position.set(0, 0, 0);
+          scene.add(sphere);
+
+
+          w.addEventListener('resize', resize, false);
+
+          resize();
+          container.appendChild(renderer.domElement);
+
+          console.log(vrstate);
+        }
+
+        function animate () {
+          w.requestAnimationFrame(animate);
+          //renderer.render(scene, camera);
+
+          if (v.pollState(vrstate)) {
+            effect.render(scene, camera);
+            controls.update();
+          }
+        };
+
+        w.addEventListener('load', function () {
+          if (!v.isInstalled()) throw new Error('NPVR plugin not installed.');
+
+          v.load(function (err) {
+            if (err) throw new Error('NPVR plugin load failed.');
+
+            init();
+            animate();
+          });
+        }, false);
+      })(window, document, THREE, vr);
+    </script>
+  </head>
+
+  <body>
+    <section id="main" role="main"></section>
+    <footer>
+      <ul>
+        <li><a href="https://github.com/benvanik/vr.js?utm_source=javascriptweekly&utm_medium=email">benvanik/vr.js</a></li>
+        <li><a href="https://github.com/troffmo5/OculusStreetView">troffmo5/OculusStreetView</a></li>
+      </ul>
+    </footer>
+  </body>
+</html>

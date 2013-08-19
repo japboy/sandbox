@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+
+    <title>Difference Blend Mode</title>
+
+    <style>
+      #main {
+        height: 100%;
+        left: 0;
+        overflow: hidden;
+        position: absolute;
+        top: 0;
+        width: 100%;
+      }
+      #main > canvas {
+        left: 50%;
+        margin-left: -640px;
+        margin-top: -360px;
+        position: absolute;
+        top: 50%;
+      }
+      footer {
+        background-color: rgba(255,255,255,0.9);
+        bottom: 10px;
+        padding: 10px;
+        position: absolute;
+        right: 10px;
+      }
+      footer > ul {
+        margin: 0;
+        padding: 0 0 0 1.5em;
+      }
+    </style>
+
+    <script>
+      (function (w, d, n) {
+
+        // Polyfills for vendor prefixes
+
+        n.getUserMedia = (n.getUserMedia ||
+                          n.mozGetUserMedia ||
+                          n.msGetUserMedia ||
+                          n.webkitGetUserMedia);
+        w.URL = (w.URL || w.webkitURL);
+
+
+        // Main
+
+        var WIDTH = 1280, HEIGHT = 720,
+            container, video,
+            source, blended;
+
+        source = {
+          el: {},
+          ctx: {},
+          data: {},
+          lastData: null
+        };
+
+        blended = {
+          el: {},
+          ctx: {},
+          data: {}
+        };
+
+        function fastAbs (value) {
+          return (value ^ (value >> 31)) - (value >> 31);
+        }
+
+        function threshold (value) {
+          return (value > 0x15) ? 0xFF : 0;
+        }
+
+        function differenceAccuracy (target, data1, data2) {
+          if (data1.length != data2.length) return null;
+          var i = 0;
+          while (i < (data1.length * 0.25)) {
+            var average1 = (data1[4*i] + data1[4*i+1] + data1[4*i+2]) / 3;
+            var average2 = (data2[4*i] + data2[4*i+1] + data2[4*i+2]) / 3;
+            var diff = threshold(fastAbs(average1 - average2));
+            target[4*i]   = diff;
+            target[4*i+1] = diff;
+            target[4*i+2] = diff;
+            target[4*i+3] = 0xFF;
+            ++i;
+          }
+        }
+
+        function blend () {
+          var width  = source.el.width,
+              height = source.el.height;
+
+          // get current webcam image data
+          source.data = source.ctx.getImageData(0, 0, width, height);
+          // create an image if the previous image doesn�t exist
+          if (!source.lastData) source.lastData = source.data;
+          // create a ImageData instance to receive the blended result
+          blended.data = blended.ctx.createImageData(width, height);
+          // blend the 2 images
+          differenceAccuracy(blended.data.data, source.data.data, source.lastData.data);
+          blended.ctx.putImageData(blended.data, 0, 0);
+
+          source.lastData = source.data;
+        }
+
+        function init () {
+          var width = w.innerWidth, height = w.innerHeight;
+
+          function handleError (code) {
+            throw new Error('No stream received.');
+          }
+
+          function handleSuccess (stream) {
+            video.src = URL.createObjectURL(stream);
+            video.onerror = function (err) { stream.stop(); };
+          }
+
+          container = d.getElementById('main');
+
+          video = d.createElement('video');
+          video.autoplay = true;
+          video.width = WIDTH;
+          video.height = HEIGHT;
+
+          source.el = d.createElement('canvas');
+          source.el.width = WIDTH;
+          source.el.height = HEIGHT;
+
+          blended.el = d.createElement('canvas');
+          blended.el.width = WIDTH;
+          blended.el.height = HEIGHT;
+
+          source.ctx = source.el.getContext('2d');
+          source.ctx.fillStyle = '#000000';
+          source.ctx.fillRect(0, 0,  source.width, source.height);
+          source.ctx.translate(WIDTH, 0);
+          source.ctx.scale(-1, 1);
+
+          blended.ctx = blended.el.getContext('2d');
+          blended.ctx.fillStyle = '#000000';
+          blended.ctx.fillRect(0, 0,  blended.width, blended.height);
+          blended.ctx.translate(WIDTH, 0);
+          blended.ctx.scale(-1, 1);
+
+          container.appendChild(blended.el);
+
+          n.getUserMedia({
+            video: true, audio: false
+          }, handleSuccess, handleError);
+        };
+
+        function animate () {
+          w.requestAnimationFrame(animate);
+
+          if (video.HAVE_ENOUGH_DATA === video.readyState) {
+            source.ctx.drawImage(video, 0, 0, WIDTH, HEIGHT);
+            blend();
+          }
+        };
+
+        w.addEventListener('load', function () {
+          init();
+          animate();
+        }, false);
+
+      })(window, document, navigator);
+    </script>
+  </head>
+
+  <body>
+    <section id="main" role="main"></section>
+    <footer>
+      <ul>
+        <li><a href="http://www.adobe.com/devnet/html5/articles/javascript-motion-detection.html">JavaScript motion detection | Adobe Developer Connection</a></li>
+      </ul>
+    </footer>
+  </body>
+</html>

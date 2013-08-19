@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+
+    <title>Sphere Point Picking</title>
+
+    <style>
+      #main,
+      #main > canvas {
+        left: 0;
+        position: absolute;
+        top: 0;
+      }
+      footer {
+        bottom: 10px;
+        position: absolute;
+        right: 10px;
+      }
+    </style>
+
+    <script src="./js/vendor/three-r60.min.js"></script>
+    <script src="./js/vendor/three-OrbitControls.js"></script>
+    <script>
+      (function (w, d, T) {
+        var Math = w.Math,
+            renderer, camera, scene, contols;
+
+        function pickSpherePoint (x0, y0, z0, radius) {
+          var u, v, theta, phi, x, y, z;
+
+          u = Math.random();
+          v = Math.random();
+          theta = 2 * Math.PI * u;
+          phi = Math.acos(2 * v - 1);
+          x = x0 + (radius * Math.sin(phi) * Math.cos(theta));
+          y = y0 + (radius * Math.sin(phi) * Math.sin(theta));
+          z = z0 + (radius * Math.cos(phi));
+
+          return { x: x, y: y, z: z }
+        }
+
+        function resize () {
+          var width = w.innerWidth,
+              height = w.innerHeight,
+              aspect = width / height;
+
+          renderer.setSize(width, height);
+          camera.aspect = aspect;
+          camera.updateProjectionMatrix();
+        }
+
+        function init () {
+          var width, height, aspect, container,
+              axes,
+              dotGeometry, dotMaterial,
+              createDot;
+
+          width = w.innerWidth;
+          height = w.innerHeight;
+          aspect = width / height;
+          container = d.getElementById('main');
+
+          renderer = new T.WebGLRenderer();
+          renderer.setClearColor(0xffffff);
+          camera = new T.PerspectiveCamera(75, aspect, 0.1, 2000);
+          camera.position.set(200, 200, 900);
+          scene = new T.Scene();
+          controls = new T.OrbitControls(camera, renderer.domElement);
+
+          axes = new T.AxisHelper(200);
+          scene.add(axes);
+
+          camera.lookAt(axes.position);
+
+
+          dotGeometry = new T.SphereGeometry(1, 16, 8);
+          dotMaterial = new T.MeshBasicMaterial({ color: 0x000000 });
+
+          createDot = function (radius) {
+            var pos, dot;
+
+            pos = pickSpherePoint(0, 0, 0, radius);
+            dot = new T.Mesh(dotGeometry.clone(), dotMaterial.clone());
+            dot.position.set(pos.x, pos.y, pos.z);
+
+            return dot;
+          };
+
+          for (var i = 0; i < 1000; i++) {
+            var dot = createDot(300);
+            scene.add(dot);
+          }
+
+
+          w.addEventListener('resize', resize, false);
+
+          resize();
+          container.appendChild(renderer.domElement);
+        }
+
+        function animate () {
+          w.requestAnimationFrame(animate);
+          renderer.render(scene, camera);
+          controls.update();
+        };
+
+        w.addEventListener('load', function () {
+          init();
+          animate();
+        }, false);
+      })(window, document, THREE);
+    </script>
+  </head>
+
+  <body>
+    <section id="main" role="main"></section>
+    <footer>
+      <ul>
+        <li><a href="http://mathworld.wolfram.com/SpherePointPicking.html">Sphere Point Picking -- from Wolfram MathWorld</a></li>
+        <li><a href="http://stackoverflow.com/questions/5531827/random-point-on-a-given-sphere">javascript - Random Point on a given Sphere - Stack Overflow</a></li>
+      </ul>
+    </footer>
+  </body>
+</html>
