@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+
+    <title>Vine Camera</title>
+
+    <style>
+      #main {
+        height: 100%;
+        left: 0;
+        overflow: hidden;
+        position: absolute;
+        top: 0;
+        width: 100%;
+      }
+      #main > img {
+        left: 50%;
+        position: absolute;
+        top: 50%;
+      }
+      #processing {
+        display: none;
+        left: 50%;
+        margin-bottom: 0;
+        margin-left: -8px;
+        margin-right: 0;
+        margin-top: -8px;
+        position: absolute;
+        top: 50%;
+      }
+      #processing.active {
+        display: block;
+      }
+    </style>
+
+    <script src="./js/vendor/q-0.9.7.min.js" charset="UTF-8"></script>
+    <script src="./js/vendor/jsgif/b64.js" charset="UTF-8"></script>
+    <script src="./js/polyfills.js" charset="UTF-8"></script>
+
+    <script id="gif" type="javascript/worker">
+      var encoder;
+
+      function init (data) {
+        var href = data.href;  // FIXME: What the fuck
+
+        importScripts(
+          'http://japboy.github.io/snippets/js/vendor/jsgif/LZWEncoder.js',
+          'http://japboy.github.io/snippets/js/vendor/jsgif/NeuQuant.js',
+          'http://japboy.github.io/snippets/js/vendor/jsgif/GIFEncoder.js'
+        );
+
+        encoder = new GIFEncoder();
+
+        encoder.setRepeat(0);
+        encoder.setQuality(1);
+        encoder.setDelay(1000 / 6);
+
+        self.postMessage({ type: 'ready' });
+      }
+
+      function frame (data) {
+        var index = data.index,
+            length = data.length,
+            width = data.width,
+            height = data.height,
+            image = data.image;
+
+        if (0 === index) {
+          encoder.start();
+          encoder.setSize(width, height);
+          encoder.addFrame(image, true);
+        } else if (index >= length) {
+          encoder.finish();
+          self.postMessage({ type: 'blob', blob: encoder.stream().getData() });
+          self.close();
+        } else {
+          encoder.setSize(width, height);
+          encoder.addFrame(image, true);
+        }
+      }
+
+      function error (ev) {
+        var msg = ['Line ', ev.lineno,
+                   ' in ', ev.filename, ': ', ev.message].join(''),
+            err = new Error(msg);
+        self.postMessage(err);
+      }
+
+      function message (ev) {
+        var data = ev.data;
+
+        switch (data.type) {
+          case 'init':
+            init(data);
+            break;
+          case 'frame':
+            frame(data);
+            break;
+        }
+      }
+
+      self.addEventListener('error', error, false);
+      self.addEventListener('message', message, false);
+    </script>
+
+    <script>
+      (function (w, d, n, Q) {
+
+        function dom () {
+          var dfr = Q.defer();
+
+          w.addEventListener('DOMContentLoaded', function () {
+            dfr.resolve();
+          }, false);
+
+          return dfr.promise;
+        }
+
+        function video () {
+          var dfr = Q.defer(),
+              el = d.createElement('video');
+
+          function ready (ev) {
+            dfr.resolve(el);
+          }
+
+          function success (stream) {
+            el.src = w.URL.createObjectURL(stream);
+
+            el.addEventListener('error', function (err) {
+              stream.stop();
+              dfr.reject(new Error(err));
+            }, false);
+          };
+
+          function error (code) {
+            dfr.reject(new Error(code));
+          };
+
+          el.autoplay = true;
+
+          el.addEventListener('canplay', ready, false);
+
+          n.getUserMedia({ video: true, audio: false }, success, error);
+
+          return dfr.promise;
+        }
+
+        function canvas (width, height) {
+          var el = d.createElement('canvas'),
+              w = width > height ? height : width;
+          el.width = w;
+          el.height = w;
+          return el;
+        }
+
+        function context (canvas) {
+          var ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#000000';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          //ctx.translate(canvas.width, 0);
+          //ctx.scale(-1, 1);
+          return ctx;
+        }
+
+        function image (blob) {
+          var el = d.createElement('img');
+          el.src = 'data:image/gif;base64,' + w.encode64(blob);
+          el.style.marginLeft = '-' + (can.width / 2) + 'px';
+          el.style.marginTop = '-' + (can.height / 2) + 'px';
+          return el;
+        }
+
+        function container (child) {
+          var el = d.getElementById('main');
+          el.appendChild(child);
+          return el;
+        }
+
+        function error () {
+          throw new Error('Something goes wrong.');
+        }
+
+        var vid, can, ctx, gif;
+
+        var fps = 6,
+            now, then = Date.now(),
+            interval = 1000 / fps,
+            delta,
+            index = 0,
+            length = 36,
+            sleep = 0;
+
+        function init () {
+          vid = arguments[0][1];
+          can = canvas(vid.videoWidth, vid.videoHeight);
+          ctx = context(can);
+
+          var blob = new w.Blob([d.querySelector('#gif').textContent]);
+
+          gif = new w.Worker(w.URL.createObjectURL(blob));
+
+          gif.addEventListener('message', function (ev) {
+            var data = ev.data;
+            switch (data.type) {
+              case 'ready':
+                animate();
+                break;
+              case 'blob':
+                d.body.removeChild(d.getElementById('processing'));
+                container(image(data.blob));
+                break;
+            }
+          }, false);
+
+          d.querySelector('#processing').className = 'active';
+
+          gif.postMessage({ type: 'init', href: d.location.href });
+        }
+
+        function record () {
+          var dx = -((vid.videoWidth - can.width) / 2),
+              dy = -((vid.videoHeight - can.height) / 2);
+
+          if (vid.HAVE_ENOUGH_DATA === vid.readyState) {
+            ctx.drawImage(vid, dx, dy);
+            gif.postMessage({
+              type: 'frame',
+              index: index,
+              length: length,
+              width: can.width,
+              height: can.height,
+              image: ctx.getImageData(0, 0, can.width, can.height).data
+            });
+          }
+        }
+
+        function animate () {
+          w.requestAnimationFrame(animate);
+
+          now = w.Date.now();
+          delta = now - then;
+
+          if (delta > interval) {
+            then = now - (delta % interval);
+
+            if (0 === (index + 1) % 6) {
+              sleep = (Math.floor(Math.random() * 6) + 1) * 1000;
+              index += 1;
+            }
+
+            if (0 >= sleep) {
+              record();
+              index += 1;
+            } else {
+              index = index;
+            }
+          }
+
+          sleep -= delta;
+        }
+
+        Q.all([dom(), video()]).fail(error).then(init);
+      })(window, document, navigator, Q);
+    </script>
+  </head>
+
+  <body>
+    <section id="main" role="main"></section>
+    <p id="processing"><img src="./img/ajax-loader.gif" alt="Processing..."></p>
+  </body>
+</html>
