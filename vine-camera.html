@@ -42,12 +42,13 @@
       var encoder;
 
       function init (data) {
-        var href = data.href;  // FIXME: What the fuck
+        var href = data.href,
+            url = href.split('/').slice(0,-1).join('/');
 
         importScripts(
-          'http://japboy.github.io/snippets/js/vendor/jsgif/LZWEncoder.js',
-          'http://japboy.github.io/snippets/js/vendor/jsgif/NeuQuant.js',
-          'http://japboy.github.io/snippets/js/vendor/jsgif/GIFEncoder.js'
+          url + '/js/vendor/jsgif/LZWEncoder.js',
+          url + '/js/vendor/jsgif/NeuQuant.js',
+          url + '/js/vendor/jsgif/GIFEncoder.js'
         );
 
         encoder = new GIFEncoder();
@@ -84,7 +85,7 @@
         var msg = ['Line ', ev.lineno,
                    ' in ', ev.filename, ': ', ev.message].join(''),
             err = new Error(msg);
-        self.postMessage(err);
+        self.postMessage({ type: 'error', error: err });
       }
 
       function message (ev) {
@@ -107,6 +108,8 @@
     <script>
       (function (w, d, n, Q) {
 
+        var vid, can, ctx, gif;
+
         function dom () {
           var dfr = Q.defer();
 
@@ -122,6 +125,9 @@
               el = d.createElement('video');
 
           function ready (ev) {
+            // TODO: Firefox doesn't seem to be able to get
+            //       `videoWidth` & `videoHeight` even if after
+            //       `canplay` or `playing` is fired.
             dfr.resolve(el);
           }
 
@@ -141,6 +147,7 @@
           el.autoplay = true;
 
           el.addEventListener('canplay', ready, false);
+          //el.addEventListener('playing', ready, false);
 
           n.getUserMedia({ video: true, audio: false }, success, error);
 
@@ -178,12 +185,6 @@
           return el;
         }
 
-        function error () {
-          throw new Error('Something goes wrong.');
-        }
-
-        var vid, can, ctx, gif;
-
         var fps = 6,
             now, then = Date.now(),
             interval = 1000 / fps,
@@ -191,6 +192,10 @@
             index = 0,
             length = 36,
             sleep = 0;
+
+        function error (data) {
+          throw data.err;
+        }
 
         function init () {
           vid = arguments[0][1];
@@ -204,6 +209,9 @@
           gif.addEventListener('message', function (ev) {
             var data = ev.data;
             switch (data.type) {
+              case 'error':
+                error(data);
+                break;
               case 'ready':
                 animate();
                 break;
@@ -220,11 +228,17 @@
         }
 
         function record () {
-          var dx = -((vid.videoWidth - can.width) / 2),
-              dy = -((vid.videoHeight - can.height) / 2);
+          var sx = ((vid.videoWidth - can.width) / 2),
+              sy = ((vid.videoHeight - can.height) / 2),
+              sw = can.width,
+              sh = can.height,
+              dx = 0,
+              dy = 0,
+              dw = can.width,
+              dh = can.height;
 
           if (vid.HAVE_ENOUGH_DATA === vid.readyState) {
-            ctx.drawImage(vid, dx, dy);
+            ctx.drawImage(vid, sx, sy, sw, sh, dx, dy, dw, dh);
             gif.postMessage({
               type: 'frame',
               index: index,
