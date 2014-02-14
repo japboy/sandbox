@@ -54,7 +54,7 @@
         encoder = new GIFEncoder();
 
         encoder.setRepeat(0);
-        encoder.setQuality(1);
+        encoder.setQuality(10);
         encoder.setDelay(1000 / 6);
 
         self.postMessage({ type: 'ready' });
@@ -180,7 +180,7 @@
         }
 
         function container (child) {
-          var el = d.getElementById('main');
+          var el = d.querySelector('#main');
           el.appendChild(child);
           return el;
         }
@@ -216,7 +216,7 @@
                 animate();
                 break;
               case 'blob':
-                d.body.removeChild(d.getElementById('processing'));
+                d.body.removeChild(d.querySelector('#processing'));
                 container(image(data.blob));
                 break;
             }
