@@ -44,13 +44,13 @@
         var href = data.href,
             url = href.split('/').slice(0,-1).join('/');
 
-        importScripts(
+        self.importScripts(
           url + '/js/vendor/jsgif/LZWEncoder.js',
           url + '/js/vendor/jsgif/NeuQuant.js',
           url + '/js/vendor/jsgif/GIFEncoder.js'
         );
 
-        encoder = new GIFEncoder();
+        encoder = new self.GIFEncoder();
 
         encoder.setRepeat(0);
         encoder.setQuality(10);
@@ -72,10 +72,7 @@
           encoder.addFrame(image, true);
         } else if (index >= length) {
           encoder.finish();
-          self.postMessage({
-            type: 'blob',
-            binary: new Uint8Array(encoder.stream().bin)
-          });
+          self.postMessage({ type: 'blob', binary: encoder.stream().bin });
           self.close();
         } else {
           encoder.setSize(width, height);
@@ -115,7 +112,8 @@
         function dom () {
           var dfr = Q.defer();
 
-          w.addEventListener('DOMContentLoaded', function () {
+          d.addEventListener('DOMContentLoaded', function done (ev) {
+            ev.target.removeEventListener(ev.type, done);
             dfr.resolve();
           }, false);
 
@@ -127,10 +125,7 @@
               el = d.createElement('video');
 
           function ready (ev) {
-            // TODO: Firefox doesn't seem to be able to get
-            //       `videoWidth` & `videoHeight` even if after
-            //       `canplay` or `playing` is fired.
-            dfr.resolve(el);
+            dfr.resolve(ev.target);
           }
 
           function success (stream) {
@@ -149,7 +144,6 @@
           el.autoplay = true;
 
           el.addEventListener('canplay', ready, false);
-          //el.addEventListener('playing', ready, false);
 
           n.getUserMedia({ video: true, audio: false }, success, error);
 
@@ -173,10 +167,9 @@
           return ctx;
         }
 
-        function image (bin) {
-          var el, blob;
+        function image (blob) {
+          var el;
           el = d.createElement('img');
-          blob = new w.Blob([bin.buffer], { type: 'image/gif' });
           el.src = w.URL.createObjectURL(blob);
           el.style.marginLeft = '-' + (can.width / 2) + 'px';
           el.style.marginTop = '-' + (can.height / 2) + 'px';
@@ -203,17 +196,15 @@
 
         function init () {
           vid = arguments[0][1];
-          can = canvas(vid.videoWidth, vid.videoHeight);
+          can = canvas(vid.videoWidth || 640, vid.videoHeight || 480);
           ctx = context(can);
 
-          var blob = new w.Blob(
-              [d.getElementById('gif').textContent],
-              { type: 'text/javascript' });
+          var blob = new w.Blob([ d.getElementById('gif').textContent ], { type: 'text/javascript' });
 
           gif = new w.Worker(w.URL.createObjectURL(blob));
 
           gif.addEventListener('message', function (ev) {
-            var data = ev.data;
+            var data = ev.data, blob;
             switch (data.type) {
               case 'error':
                 error(data);
@@ -223,7 +214,8 @@
                 break;
               case 'blob':
                 d.body.removeChild(d.getElementById('processing'));
-                container(image(data.binary));
+                blob = new w.Blob([ (new Uint8Array(data.binary)).buffer ], { type: 'image/gif' });
+                container(image(blob));
                 break;
             }
           }, false);
