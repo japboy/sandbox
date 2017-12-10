@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+
+    <link rel="preload" href="./snowflake1.png" as="image">
+    <link rel="preload" href="./snowflake2.png" as="image">
+    <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/4.6.0/pixi.min.js" as="script">
+
+    <title>Snowfalls with PIXI.js</title>
+
+    <meta name="viewport" content="width=device-width, user-scalable=yes">
+
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+      }
+
+      #container {
+        background-image: linear-gradient(to top, black, blue);
+        height: 96vh;
+        margin: 2vh 2vw;
+        padding: 0;
+        position: relative;
+        width: 96vw;
+      }
+    </style>
+
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/4.6.0/pixi.min.js"></script>
+    <script>
+      const resources = {};
+
+      function random(min, max) {
+        return Math.floor((Math.random() * (max - min)) + min);
+      }
+
+      function main(PIXI, currentResources, targetElement, number, x, y) {
+        let containerWidth = targetElement.offsetWidth || targetElement.innerWidth;
+        let containerHeight = targetElement.offsetHeight || targetElement.innerHeight;
+
+        if (!PIXI.filters.MyFilter) {
+          class MyFilter extends PIXI.Filter {
+            constructor() {
+              const vertex = null;
+              const fragment = `
+                precision mediump float;
+                varying vec2 vTextureCoord;
+                uniform sampler2D uSampler;
+                uniform mat3 mappedMatrix;
+                void main(void) {
+                  // 座標の正規化: テクスチャ中央を原点とする
+                  vec3 mappedCoord = vec3(vTextureCoord, 1.0) * mappedMatrix;
+                  vec2 p = mappedCoord.xy + vec2(-${x}, -${y});
+                  // 元テクスチャ
+                  vec4 color = texture2D(uSampler, vTextureCoord);
+                  // 中央からの距離に応じて光具合変える
+                  float l = 0.2 / length(p);
+                  color.rgb *= vec3(l, l, l);
+                  gl_FragColor = color;
+                }
+              `;
+              const uniforms = {
+                mappedMatrix: { type: 'mat3', value: new PIXI.Matrix() },
+              };
+              super(vertex, fragment, uniforms);
+            }
+            // テクスチャの正規化座標を取るためのおまじない・・・らしい
+            // Ref: http://www.html5gamedevs.com/topic/24347-weird-filterareas-size-on-v4/
+            apply(filterManager, input, output, clear) {
+              filterManager.calculateNormalizedScreenSpaceMatrix(this.uniforms.mappedMatrix);
+              filterManager.applyFilter(this, input, output, clear);
+            }
+          }
+
+          // eslint-disable-next-line no-param-reassign
+          PIXI.filters.MyFilter = MyFilter;
+        }
+
+        // アプリ生成
+        const app = new PIXI.Application({
+          width: containerWidth,
+          height: containerHeight,
+          transparent: true,
+        });
+
+        function createChips(textures, num, min, max) {
+          const chips = [];
+          for (let i = 0; i < num; i += 1) {
+            const size = random(min, max);
+            const force = 0.0001;
+            const mass = (size * 3) ** -1; // 大きいほど質量を小さく
+            const sprite = new PIXI.Sprite(textures[random(1, textures.length)]);
+            /* eslint-disable no-param-reassign */
+            sprite.acceleration = new PIXI.Point(1, force / mass);
+            sprite.velocity = new PIXI.Point(0, 0);
+            sprite.position.set(Math.random() * app.renderer.width, Math.random() * app.renderer.height * -1);
+            sprite.flag = Math.floor(Math.random() * 2);
+            sprite.width = size;
+            sprite.height = size;
+            sprite.pivot.set(sprite.width * 0.5, sprite.height * 0.5);
+            /* eslint-enable no-param-reassign */
+            chips.push(sprite);
+          }
+          return chips;
+        }
+
+        // オブジェクト追加
+        const mainNumber = number * 0.8;
+        const subNumber = number - mainNumber;
+
+        const snowflakes = createChips([resources.snowflake1.texture, resources.snowflake2.texture], mainNumber, 8, 30);
+
+        snowflakes.forEach(snowflake => app.stage.addChild(snowflake));
+
+        // フィルタを適用
+        const myFilter = new PIXI.filters.MyFilter();
+        app.stage.filters = [myFilter];
+
+        // メインループ
+        app.ticker.add(() => {
+          snowflakes.forEach((snowflake) => {
+            /* eslint-disable no-param-reassign */
+            if (snowflake.position.y < app.renderer.height + (Math.random() * app.renderer.height)) {
+              snowflake.velocity.x += snowflake.acceleration.x;
+              snowflake.position.x += Math.cos((snowflake.width ** -1) * snowflake.velocity.x) * snowflake.width * 0.04;
+              snowflake.velocity.y += snowflake.acceleration.y;
+              snowflake.position.y += snowflake.velocity.y;
+              snowflake.alpha = 1 - (snowflake.position.y / app.renderer.height);
+            } else {
+              snowflake.velocity.x = 0;
+              snowflake.velocity.y = 0;
+              snowflake.position.x = Math.random() * app.renderer.width;
+              snowflake.position.y = Math.random() * app.renderer.height * -1;
+              snowflake.flag = Math.floor(Math.random() * 2);
+            }
+            if (snowflake.flag === 1) {
+              snowflake.rotation += Math.PI / 180;
+            } else {
+              snowflake.rotation -= Math.PI / 180;
+            }
+            /* eslint-enable no-param-reassign */
+          });
+        });
+
+        // app.view canvas スタイル定義
+        app.view.style.position = 'absolute';
+        app.view.style.top = '0';
+        app.view.style.left = '0';
+
+        // リサイズ対応
+        function resize() {
+          containerWidth = targetElement.offsetWidth || targetElement.innerWidth;
+          containerHeight = targetElement.offsetHeight || targetElement.innerHeight;
+          /* eslint-disable no-param-reassign */
+          app.stage.scale.x = 1;
+          app.stage.scale.y = 1;
+          /* eslint-enable no-param-reassign */
+          app.renderer.resize(containerWidth, containerHeight);
+        }
+        window.addEventListener('resize', resize, false);
+        window.addEventListener('orientationchange', resize, false);
+        resize();
+
+        // 後始末
+        function destroy(event) {
+          targetElement.removeEventListener(event.type, destroy);
+          window.removeEventListener('resize', resize);
+          window.removeEventListener('orientationchange', resize);
+        }
+        targetElement.addEventListener('let-it-end', destroy, false);
+
+        targetElement.insertBefore(app.view, targetElement.firstChild);
+      }
+
+      async function letItSnow(selector, number = 100, x = 0.5, y = 0.5) {
+        const targetElement = document.querySelector(selector);
+
+        if (!targetElement) return;
+
+        if (!resources.snowflake1 || !resources.snowflake2) {
+          const loader = new PIXI.loaders.Loader();
+          loader.add('snowflake1', 'snowflake1.png');
+          loader.add('snowflake2', 'snowflake2.png');
+          loader.load((currentLoader, currentResources) => {
+            resources.snowflake1 = currentResources.snowflake1;
+            resources.snowflake2 = currentResources.snowflake2;
+            main(PIXI, currentResources, targetElement, number, x, y);
+          });
+        } else {
+          main(PIXI, resources, targetElement, number);
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        letItSnow('#container');
+      }, false);
+    </script>
+  </head>
+  <body>
+    <div id="container"></div>
+  </body>
+</html>
