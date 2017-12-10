@@ -1,0 +1,26 @@
+# EditorConfig is awesome: http://EditorConfig.org
+
+# top-most EditorConfig file
+root = true
+
+[*]
+end_of_line = lf
+charset = utf-8
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# Markdown
+[*.md]
+trim_trailing_whitespace = false
+
+# Git configuration
+[{.gitattributes,.gitignore}]
+indent_style = tab
+tab_width = 4
+
+# Web frontend coding
+[*.{css,html,js,json}]
+indent_style = space
+indent_size = 2
